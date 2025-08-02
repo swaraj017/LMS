@@ -1,30 +1,56 @@
-import cors from "cors";
-import express from "express";
-import { readdirSync } from 'fs';
-import mongoose from "mongoose";
-const morgan = require("morgan");
-require("dotenv").config();
+const express = require("express")
+const mongoose = require("mongoose")
+const cors = require("cors")
+require("dotenv").config()
 
-// create express app
-const app = express();
+const app = express()
+const PORT = process.env.PORT || 5000
 
-// db
+// Middleware
+app.use(cors())
+app.use(express.json())
+
+// MongoDB connection
+const MONGODB_URI = process.env.MONGODB_URI
+
+if (!MONGODB_URI) {
+  console.error(" MONGODB_URI environment variable is not set!")
+  process.exit(1)
+}
+
+console.log("Attempting to connect to MongoDB...")
+
 mongoose
-  .connect(process.env.DATABASE
-  )
-  .then(() => console.log("**DB CONNECTED**"))
-  .catch((err) => console.log("DB CONNECTION ERR => ", err));
+  .connect(MONGODB_URI)
+  .then(() => {
+    console.log(" Connected to MongoDB successfully!")
+  })
+  .catch((err) => {
+    console.error(" MongoDB connection error:", err.message)
+    process.exit(1)
+  })
 
-// apply middlewares
-app.use(cors());
-app.use(express.json());
-app.use(morgan("dev"));
+// Import routes
+const authRoutes = require("./routes/auth")
+const courseRoutes = require("./routes/courses")
+const enrollmentRoutes = require("./routes/enrollments")
 
+// Use routes
+app.use("/api/auth", authRoutes)
+app.use("/api/courses", courseRoutes)
+app.use("/api/enrollments", enrollmentRoutes)
 
-//connection routes dynamicllay
-readdirSync("./routes").map((r)=>app.use("/api", require(`./routes/${r}`)));
+// Basic route
+app.get("/", (req, res) => {
+  res.json({ message: "LMS API Server with JWT Auth is running!" })
+})
 
-// port
-const port = process.env.PORT || 5000;
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack)
+  res.status(500).json({ message: "Something went wrong!" })
+})
 
-app.listen(port, () => console.log(`Server is running on port ${port}`));
+app.listen(PORT, () => {
+  console.log(` Server is running on port ${PORT}`)
+})
